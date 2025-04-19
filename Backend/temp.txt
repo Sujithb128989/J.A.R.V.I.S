@@ -1,0 +1,6 @@
+weather
+news
+system details
+inernet
+battery
+tab automation

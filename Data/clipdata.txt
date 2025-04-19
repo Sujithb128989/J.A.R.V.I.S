@@ -1,0 +1,3 @@
+ school conducted a survey among its students to find out their favorite extracurricular activities. 
+      The results showed that 30% of the students preferred sports, 25% chose music, 20% liked art, 15% were interested in drama, 
+      and the remaining 10% selected debate. Represent this data using a pie chart.
