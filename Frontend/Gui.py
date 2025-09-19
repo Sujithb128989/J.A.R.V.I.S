@@ -1,19 +1,53 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTextEdit, QStackedWidget, QWidget, QLineEdit, QVBoxLayout, QPushButton, QLabel, QSizePolicy, QHBoxLayout, QFrame
-from PyQt5.QtGui import QIcon, QPainter,QTextBlockFormat, QMovie, QColor, QTextCharFormat, QFont,QPixmap 
-from PyQt5.QtCore import Qt, QSize, QTimer
-from dotenv import dotenv_values
 import sys
 import os
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTextEdit, QWidget, QVBoxLayout, QPushButton, QLabel, QHBoxLayout, QFrame
+from PyQt5.QtGui import QIcon, QPainter, QColor, QTextCharFormat, QFont, QMovie
+from PyQt5.QtCore import Qt, QSize, QTimer
+from dotenv import load_dotenv
 
-# Load environment variables
-env_vars = dotenv_values(".env")
-Assistantname = env_vars.get("Assistantname")
-current_dir = os.getcwd()
+load_dotenv()
 
-TempDirPath = rf"{current_dir}\Frontend\Files"
-GraphicsDirPath = rf"{current_dir}\Frontend\Graphics"
+ASSISTANT_NAME = os.getenv("Assistantname", "J.A.R.V.I.S")
+CURRENT_DIR = os.getcwd()
+TEMP_DIR_PATH = os.path.join(CURRENT_DIR, "Frontend", "Files")
+GRAPHICS_DIR_PATH = os.path.join(CURRENT_DIR, "Frontend", "Graphics")
 
+# --- Helper Functions (re-added for compatibility) ---
 
+def get_file_path(directory, filename):
+    """Constructs a full path to a file."""
+    return os.path.join(directory, filename)
+
+def read_from_file(filepath):
+    """Reads content from a file."""
+    try:
+        with open(filepath, "r", encoding="utf-8") as file:
+            return file.read().strip()
+    except FileNotFoundError:
+        return ""
+
+def write_to_file(filepath, content):
+    """Writes content to a file."""
+    with open(filepath, "w", encoding="utf-8") as file:
+        file.write(content)
+
+def SetAssistantStatus(Status):
+    write_to_file(get_file_path(TEMP_DIR_PATH, "Status.data"), Status)
+
+def GetAssistantStatus():
+    return read_from_file(get_file_path(TEMP_DIR_PATH, "Status.data"))
+
+def ShowTextToScreen(Text):
+    write_to_file(get_file_path(TEMP_DIR_PATH, "Responses.data"), Text)
+
+def SetMicrophoneStatus(Command):
+    write_to_file(get_file_path(TEMP_DIR_PATH, "Mic.data"), Command)
+
+def GetMicrophoneStatus():
+    return read_from_file(get_file_path(TEMP_DIR_PATH, "Mic.data"))
+
+def TempDirectoryPath(Filename):
+    return get_file_path(TEMP_DIR_PATH, Filename)
 
 def AnswerModifier(Answer):
     lines = Answer.split('\n')
@@ -21,479 +55,177 @@ def AnswerModifier(Answer):
     modified_answer = '\n'.join(non_empty_lines)
     return modified_answer
 
-
 def QueryModifier(Query):
     new_query = Query.lower().strip()
     query_words = new_query.split()
     question_words = ["how", "what", "who", "where", "when", "why", "which", "whose", "whom", "can you", "what's", "where's", "how"]
 
     if any(word in new_query for word in question_words):
-        if query_words[-1][-1] in ['.', '?', '1']:
+        if query_words and query_words[-1][-1] in ['.', '?', '1']:
             new_query = new_query[:-1]
         else:
             new_query = new_query + "?"
     else:
-        if query_words[-1][-1] in ['.', '?', '1']:
+        if query_words and query_words[-1][-1] in ['.', '?', '1']:
             new_query = new_query[:-1] + "."
         else:
             new_query = new_query + ","
     return new_query.capitalize()
 
-
-def SetMicrophoneStatus(Command):
-    with open(rf"{TempDirPath}\Mic.data", "w", encoding="utf-8") as file:
-        file.write(Command)
-
-
-def GetMicrophoneStatus():
-    with open(rf"{TempDirPath}\Mic.data", "r", encoding="utf-8") as file:
-        Status = file.read()
-    return Status
-
-
-def SetAssistantStatus(Status):
-    with open(rf"{TempDirPath}\Status.data", "w", encoding="utf-8") as file:
-        file.write(Status)
-
-
-def GetAssistantStatus():
-    with open(rf"{TempDirPath}\Status.data", "r", encoding="utf-8") as file:
-        Status = file.read()
-    return Status
-
-def GraphicsDirectoryPath(Filename):
-    Path = rf"{GraphicsDirPath}\{Filename}"
-    return Path
-
-
-def TempDirectoryPath(Filename):
-    Path = rf"{TempDirPath}\{Filename}"
-    return Path
-
-
-def ShowTextToScreen(Text):
-    with open(rf"{TempDirPath}\Responses.data", "w", encoding='utf-8') as file:
-        file.write(Text)
-
-
-# MicButtonInitialed and MicButtonClosed definitions
-def MicButtonInitialed():
-    SetMicrophoneStatus("False")
-
-
-def MicButtonClosed():
-    SetMicrophoneStatus("True")
-
-old_chat_message = "" 
-class ChatSection(QWidget):
-
-    def __init__(self):
-        super(ChatSection, self).__init__()
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(-10, 40, 40, 100)
-        layout.setSpacing(-100)
-
-        self.chat_text_edit = QTextEdit()
-        self.chat_text_edit.setReadOnly(True)
-        self.chat_text_edit.setTextInteractionFlags(Qt.NoTextInteraction)
-        self.chat_text_edit.setFrameStyle(QFrame.NoFrame)
-        layout.addWidget(self.chat_text_edit)
-
-        self.setStyleSheet("background-color: black;")
-
-        layout.setSizeConstraint(QVBoxLayout.SetDefaultConstraint)
-        layout.setStretch(1, 1)
-        self.setSizePolicy(QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding))
-
-        text_color = QColor(Qt.blue)
-        text_color_text = QTextCharFormat()
-        text_color_text.setForeground(text_color)
-
-        self.chat_text_edit.setCurrentCharFormat(text_color_text)
-
-        self.gif_label = QLabel()
-        self.gif_label.setStyleSheet("border: none;")
-        movie = QMovie(GraphicsDirectoryPath('Jarvis2.gif'))
-
-        max_gif_size_W = 480
-        max_gif_size_H =  270
-
-        movie.setScaledSize(QSize(max_gif_size_W, max_gif_size_H))
-        self.gif_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
-        self.gif_label.setMovie(movie)
-
-        movie.start()
-        layout.addWidget(self.gif_label)
-
-        self.label = QLabel("")
-        self.label.setStyleSheet("color: white; font-size:16px; margin-right: 195px; border: none; margin-top: -30px;")
-        self.label.setAlignment(Qt.AlignRight)
-        layout.addWidget(self.label)
-
-        layout.setSpacing(-10)
-        layout.addWidget(self.gif_label)
-
-        font = QFont()
-        font.setPointSize(13)
-        self.chat_text_edit.setFont(font)
-
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.loadMessages)
-        self.timer.timeout.connect(self.SpeechRecogText)
-
-        self.timer.start(5)
-        self.chat_text_edit.viewport().installEventFilter(self)
-
-        self.setStyleSheet("""
-              QWidget {
-              background-color: black;
-              }
-
-              QScrollBar:vertical {
-              border: none;
-              background: black;
-              width: 10px;
-              margin: 0px 0px 0px 0px;
-              }
-   
-              QScrollBar::handle:vertical {
-              background: white;
-              min-height: 20px;
-              }
-
-              QScrollBar::add-line:vertical {
-              background: black;
-              subcontrol-position: bottom;
-              subcontrol-origin: margin;
-              height: 10px;
-              }
-
-              QScrollBar::sub-line:vertical {
-              background: black;
-              subcontrol-position: bottom;
-              subcontrol-origin: margin;
-              height: 10px;
-              }
-
-              QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
-              border: none;
-              background: none;
-              color: none;
-              }
-
-             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-             background: none;
-             }
-
-             QTextEdit {
-             color: white;
-             }
-
-             QLabel {
-             color: white;
-             }
-         """)
-
-
-    def loadMessages(self):
-        global old_chat_message
-
-        with open(TempDirectoryPath('Responses.data'), "r", encoding='utf-8') as file:
-            messages = file.read()
-            if None==messages:
-                pass
-            elif len(messages)<=1:
-                pass
-            elif str(old_chat_message) == str(messages):
-                pass
-
-            else:
-               self.addMessage(messages, color='white')
-               old_chat_message = messages
-    def SpeechRecogText(self):
-       
-            with open(TempDirectoryPath('Status.data'), "r", encoding="utf-8") as file:
-               messages = file.read().strip()  # Read the file content and strip extra spaces
-               self.label.setText(messages)  # Set the label text to the content of 'messages'
- 
-
-    def load_icon(self, path, width=60, height=60):
-        pixmap = QPixmap(path)
-        new_pixmap = pixmap.scaled(width, height)
-        self.icon_label.setPixmap(new_pixmap)
-
-    def toggle_icon(self, event=None):
-        if self.toggled:
-            self.load_icon(GraphicsDirectoryPath('voice.png'), 225, 225)
-            MicButtonInitialed()
-        else:
-            self.load_icon(GraphicsDirectoryPath('MicOn.png'), 200, 200)
-            MicButtonClosed()
-        self.toggled = not self.toggled
-
-
-    def addMessage(self, message, color):
-        cursor = self.chat_text_edit.textCursor()  # Correct way to get the text cursor
-
-        format = QTextCharFormat()
-        formatm = QTextBlockFormat()
-        formatm.setTopMargin(10)
-        formatm.setLeftMargin(10)
-        format.setForeground(QColor(color))
-        cursor.setCharFormat(format)
-        cursor.setBlockFormat(formatm)
-        cursor.insertText(message + "\n")
-        self.chat_text_edit.setTextCursor(cursor)
-class InitialScreen(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        desktop = QApplication.desktop()
-        screen_width = desktop.screenGeometry().width()
-        screen_height = desktop.screenGeometry().height()
-        
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        
-        
-        # GIF label
-        gif_label = QLabel()
-        movie = QMovie(GraphicsDirectoryPath('jarvis.gif'))
-        gif_label.setMovie(movie)
-        max_gif_size_H = int(screen_width / 16 * 9)
-        movie.setScaledSize(QSize(screen_width, max_gif_size_H))
-        gif_label.setAlignment(Qt.AlignCenter)
-        movie.start()
-        gif_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        
-        # Icon label (for microphone)
-        self.icon_label = QLabel()
-        pixmap = QPixmap(GraphicsDirectoryPath('Micon.png'))
-        new_pixmap = pixmap.scaled(60, 60)
-        self.icon_label.setPixmap(new_pixmap)
-        self.icon_label.setFixedSize(150, 150)
-        self.icon_label.setAlignment(Qt.AlignCenter)
-        
-        # Initial icon state and toggle
-        self.toggled = True
-        self.toggle_icon()
-
-        # Connecting the icon label to toggle icon
-        self.icon_label.mousePressEvent = self.toggle_icon
-        
-        self.label = QLabel("")
-        self.label.setStyleSheet("color: white; font-size:16px; margin-bottom:0;")
-        
-        # Layout configuration
-        content_layout.addWidget(gif_label, alignment=Qt.AlignCenter)
-        content_layout.addWidget(self.label, alignment=Qt.AlignCenter)
-        content_layout.addWidget(self.icon_label, alignment=Qt.AlignCenter)
-        content_layout.setContentsMargins(0, 0, 0, 150)
-        
-        self.setLayout(content_layout)
-        self.setFixedHeight(screen_height)
-        self.setFixedWidth(screen_width)
-        self.setStyleSheet("background-color: black;")
-        
-        # Timer for speech recognition updates
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.SpeechRecogText)
-        self.timer.start(5)
-
-    def SpeechRecogText(self):
-        with open(TempDirectoryPath('Status.data'), "r", encoding='utf-8') as file:
-            messages = file.read()
-            self.label.setText(messages)
-
-    def load_icon(self, path, width=60, height=60):
-        pixmap = QPixmap(path)
-        new_pixmap = pixmap.scaled(width, height)
-        self.icon_label.setPixmap(new_pixmap)
-
-    def toggle_icon(self, event=None):
-        if self.toggled:
-            self.load_icon(GraphicsDirectoryPath('MicOff.png'), 60, 60)
-            MicButtonInitialed()
-        else:
-            self.load_icon(GraphicsDirectoryPath('MicOn.png'), 60, 60)
-            MicButtonClosed()
-        self.toggled = not self.toggled
-
-class MessageScreen(QWidget):
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        desktop = QApplication.desktop()
-        screen_width = desktop.screenGeometry().width()
-        screen_height = desktop.screenGeometry().height()
-
-        layout = QVBoxLayout()
-        label = QLabel("")
-        layout.addWidget(label)
-
-        chat_section = ChatSection()
-        layout.addWidget(chat_section)
-
-        self.setLayout(layout)
-        self.setStyleSheet("background-color: black;")
-        self.setFixedHeight(screen_height)
-        self.setFixedWidth(screen_width)
-
-
-class CustomTopBar(QWidget):
-
-    def __init__(self, parent, stacked_widget):
-        super().__init__(parent)
-        self.initUI()
-        self.current_screen = None
-        self.stacked_widget = stacked_widget
-
-    def initUI(self):
-        self.setFixedHeight(50)
-        layout = QHBoxLayout(self)
-        layout.setAlignment(Qt.AlignRight)
-
-        home_button = QPushButton()
-        home_icon = QIcon(GraphicsDirectoryPath("Home.png"))
-        home_button.setIcon(home_icon)
-        home_button.setText(" Home")
-        home_button.setStyleSheet("height:40px; line-height:40px; background-color: white; color: black")
-
-        message_button = QPushButton()
-        message_icon = QIcon(GraphicsDirectoryPath("Chats.png"))
-        message_button.setIcon(message_icon)
-        message_button.setText(" Chat")
-        message_button.setStyleSheet("height:40px; line-height:40px; background-color:white; color: black")
-
-        minimize_button = QPushButton()
-        minimize_icon = QIcon(GraphicsDirectoryPath('minimize2.png'))
-        minimize_button.setIcon(minimize_icon)
-        minimize_button.setStyleSheet("background-color:white")
-        minimize_button.clicked.connect(self.minimizeWindow)
-
-        self.maximize_button = QPushButton()
-        self.maximize_icon = QIcon(GraphicsDirectoryPath('maximize.png'))
-        self.restore_icon = QIcon(GraphicsDirectoryPath('minimize.png'))
-        self.maximize_button.setIcon(self.maximize_icon)
-        self.maximize_button.setIcon(self.maximize_icon)
-        self.maximize_button.setFlat(True)
-        self.maximize_button.setStyleSheet("background-color:white")
-        self.maximize_button.clicked.connect(self.maximizeWindow)
-        close_button = QPushButton()
-        close_icon = QIcon(GraphicsDirectoryPath('close.png'))
-        close_button.clicked.connect(self.closeWindow)
-        close_button.setStyleSheet("background-color: transparent; border: none; width: 40px; height: 40px;")
-        line_frame = QFrame()
-        line_frame.setFixedHeight(1)
-        line_frame.setFrameShape(QFrame.HLine)
-        line_frame.setFrameShadow(QFrame.Sunken)
-        line_frame.setStyleSheet("border-color:black;")
-        title_label = QLabel( f"{str(Assistantname).capitalize()} AI")
-        title_label.setStyleSheet("color:black; font-size: 18px;; background-color:white")
-
-        home_button.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
-        message_button.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
-        layout.addWidget(title_label)
-        layout.addStretch(1)
-        layout.addWidget(home_button)
-        layout.addWidget(message_button)
-        layout.addStretch(1)
-        layout.addWidget(minimize_button)
-        layout.addWidget(self.maximize_button)
-        layout.addWidget(close_button) 
-        layout.addWidget(line_frame)
-        self.draggable = True
-        self.offset = None
-
-
-    def paintEvent(self,event):
-        painter = QPainter(self)
-        painter.fillRect(self.rect(),Qt.white)
-        super().paintEvent(event)
-        
-
-    def minimizeWindow(self):
-        self.parent().showMinimized()
-
-    def maximizeWindow(self):
-        if self.parent().isMaximized():
-            self.parent().showNormal()
-            self.maximize_button.setIcon(self.maximize_icon)
-        else:
-            self.parent().showMaximized()
-            self.maximize_button.setIcon(self.restore_icon)
-
-    def closeWindow(self):
-        self.parent().close()
-
-    def mousePressEvent(self, event):
-        if self.draggable:
-            self.offset = event.pos()
-
-
-    def mouseMoveEvent(self, event):
-      if self.draggable and self.offset:
-        new_pos = event.globalpos() - self.offset
-        self.parent().move(new_pos)
-    
-    def showMessageScreen(self,event):
-
-        if self.current_screen is not None:  
-            self.current_screen.hide()
-        
-        Message_Screen = MessageScreen(self)
-        layout = self.parent().layout()
-        if layout is not None:
-            layout.addWidget(Message_Screen)
-        
-        self.current_screen = Message_Screen
-
-
-    def showInitialScreen(self):
-        if self.current_screen is not None:
-            self.current_screen.hide()
-        Initial_Screen = InitialScreen(self)
-        layout = self.parent().layout()
-        if layout is not None:
-            layout.addWidget(Initial_Screen)
-        self.current_screen = Initial_Screen
-
-
-
-class MainWindow(QMainWindow):
-
+# --- Centralized Stylesheet ---
+
+STYLESHEET = """
+QWidget {
+    background-color: #121212;
+    color: #E0E0E0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+QMainWindow {
+    border: 1px solid #333;
+}
+
+QTextEdit {
+    background-color: #1E1E1E;
+    border: 1px solid #333;
+    border-radius: 4px;
+    font-size: 14px;
+    padding: 10px;
+}
+
+QScrollBar:vertical {
+    border: none;
+    background: #1E1E1E;
+    width: 10px;
+    margin: 0px 0px 0px 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: #555;
+    min-height: 20px;
+    border-radius: 5px;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    background: none;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QPushButton#MicButton {
+    background-color: #1E1E1E;
+    border: 2px solid #555;
+    border-radius: 35px; /* Makes it circular */
+    padding: 10px;
+}
+
+QPushButton#MicButton:hover {
+    border-color: #007ACC;
+}
+
+QLabel#StatusLabel {
+    font-size: 18px;
+    font-weight: bold;
+    color: #00AACC;
+}
+
+QLabel#TitleLabel {
+    font-size: 12px;
+    color: #888;
+}
+"""
+
+class JarvisUI(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.mic_is_on = False
+        self.old_chat_message = ""
+        self.old_status_message = ""
         self.initUI()
 
     def initUI(self):
-        desktop = QApplication.desktop()
-        screen_width = desktop.screenGeometry().width()
-        screen_height = desktop.screenGeometry().height()
+        self.setWindowTitle(f"{ASSISTANT_NAME} AI")
+        self.setGeometry(100, 100, 600, 800)
+        self.setStyleSheet(STYLESHEET)
 
-        stacked_widget = QStackedWidget(self)
+        # Central Widget and Layout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
 
-        initial_screen = InitialScreen()  # Placeholder for initial screen widget
-        message_screen = MessageScreen()
+        # Title Label
+        title_label = QLabel(f"{ASSISTANT_NAME} AI", self)
+        title_label.setObjectName("TitleLabel")
+        title_label.setAlignment(Qt.AlignCenter)
 
-        stacked_widget.addWidget(initial_screen)
-        stacked_widget.addWidget(message_screen)
+        # Chat Display
+        self.chat_display = QTextEdit(self)
+        self.chat_display.setReadOnly(True)
 
-        self.setGeometry(0, 0, screen_width, screen_height)
-        self.setStyleSheet("background-color: black;")
+        # Status Label
+        self.status_label = QLabel("Initializing...", self)
+        self.status_label.setObjectName("StatusLabel")
+        self.status_label.setAlignment(Qt.AlignCenter)
 
-        top_bar = CustomTopBar(self, stacked_widget)
-        self.setMenuWidget(top_bar)
-        self.setCentralWidget(stacked_widget)
+        # Microphone Button
+        self.mic_button = QPushButton(self)
+        self.mic_button.setObjectName("MicButton")
+        self.mic_button.setFixedSize(70, 70)
+        self.mic_button.setIconSize(QSize(40, 40))
+        self.mic_button.clicked.connect(self.toggle_microphone)
+        self.update_mic_icon()
 
+        # Layout Assembly
+        main_layout.addWidget(title_label)
+        main_layout.addWidget(self.chat_display, 1) # Give chat display more stretch
+        main_layout.addWidget(self.status_label)
+
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        button_layout.addWidget(self.mic_button)
+        button_layout.addStretch()
+        main_layout.addLayout(button_layout)
+
+        # Timer to update UI from files
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_ui_from_files)
+        self.timer.start(200) # Update every 200ms
+
+    def toggle_microphone(self):
+        self.mic_is_on = not self.mic_is_on
+        SetMicrophoneStatus(str(self.mic_is_on))
+        self.update_mic_icon()
+
+    def update_mic_icon(self):
+        icon_path = "MicOn.png" if self.mic_is_on else "MicOff.png"
+        self.mic_button.setIcon(QIcon(get_file_path(GRAPHICS_DIR_PATH, icon_path)))
+
+    def update_ui_from_files(self):
+        # Update chat display
+        chat_message = read_from_file(get_file_path(TEMP_DIR_PATH, "Responses.data"))
+        if chat_message and chat_message != self.old_chat_message:
+            self.chat_display.append(chat_message)
+            self.old_chat_message = chat_message
+
+        # Update status label
+        status_message = read_from_file(get_file_path(TEMP_DIR_PATH, "Status.data"))
+        if status_message and status_message != self.old_status_message:
+            self.status_label.setText(status_message)
+            self.old_status_message = status_message
 
 def GraphicalUserInterface():
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = JarvisUI()
     window.show()
     sys.exit(app.exec_())
 
-
 if __name__ == "__main__":
+    # Initialize status files
+    SetMicrophoneStatus("False")
+    SetAssistantStatus("Ready")
+    ShowTextToScreen("")
     GraphicalUserInterface()

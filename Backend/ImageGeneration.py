@@ -2,10 +2,12 @@ import asyncio
 from random import randint
 from PIL import Image
 import requests
-from dotenv import get_key
+from dotenv import load_dotenv
 import os
 from time import sleep
 from Speech import TextToSpeech as speak
+
+load_dotenv()
 
 def open_images(prompt):
     speak("displaying images,sir")
@@ -22,7 +24,13 @@ def open_images(prompt):
             print(f"Failed to open {image_path}: {e}")
 
 API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
-headers = {"Authorization": f"Bearer {get_key('.env', 'HuggingFaceAPIKey')}"}
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+if not HUGGINGFACE_API_KEY:
+    speak("Hugging Face API key is not configured. Please set it in the .env file.")
+    # Exit or handle the absence of the key gracefully
+    exit()
+
+headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
 
 async def Query(payload):
     print(f"Sending API request with payload: {payload}")
@@ -62,16 +70,16 @@ while True:
         with open(r"Frontend\Files\Imagegeneration.data", "r") as f:
             Data: str = f.read()
             print(f"Read from file: {Data}")
-        
+
         Prompt, status = Data.split(",")
-       
-        
+
+
         if status == "True":
             print("Generating Images...")
             GenerateImages(prompt=Prompt)
             with open(r"Frontend\Files\Imagegeneration.data", "w") as f:
                 f.write("False,False")
-               
+
             break
         else:
             sleep(1)

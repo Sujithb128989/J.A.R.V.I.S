@@ -5,13 +5,20 @@ import json
 import pyaudio
 import numpy as np
 from scipy.signal import chirp
-from Speech import TextToSpeech as speak
+from .tts_utils import speak
 from groq import Groq
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 import threading
 
-env_vars = dotenv_values(".env")
-client = Groq(api_key=env_vars.get("GroqAPIKey"))
+load_dotenv()
+
+# Initialize client
+GroqAPIKey = os.getenv("GroqAPIKey")
+client = None
+if GroqAPIKey:
+    client = Groq(api_key=GroqAPIKey)
+else:
+    print("Warning: GroqAPIKey not found in .env file. Alarm setting will not work.")
 
 def play_chirp():
     t = np.linspace(0, 5, 44100 * 5)
@@ -22,9 +29,13 @@ def play_chirp():
     stream.close()
     p.terminate()
 
-ALARM_FILE = r"Frontend\Files\AlarmData.json"
+ALARM_FILE = os.path.join("Frontend", "Files", "AlarmData.json")
 
 def add_alarm(text):
+    if not client:
+        speak("The alarm service is not configured. Please set the GroqAPIKey in the .env file.")
+        return
+
     prompt = f"Parse '{text}' to JSON: {{'activity': str, 'time': 'YYYY-MM-DD HH:MM', 'triggered': False}}. Current date: {datetime.now().strftime('%Y-%m-%d')}"
     try:
         resp = client.chat.completions.create(model="mixtral-8x7b-32768", messages=[{"role": "user", "content": prompt}]).choices[0].message.content
