@@ -9,19 +9,22 @@ import os
 from Speech import TextToSpeech as speak  # Assuming this is your TTS module
 import asyncio
 from google.api_core import exceptions
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def parse_command_fallback(command):
     """Fallback regex-based command parser if Gemini fails."""
     platform_match = re.search(r"(whatsapp|telegram)", command.lower())
     platform = platform_match.group(0) if platform_match else "whatsapp"
-    
+
     recipient_match = re.search(r"(to|on|send)\s+([a-zA-Z]+)", command.lower())
     target_name = recipient_match.group(2) if recipient_match else None
-    
+
     message_intent = re.sub(r"(send|to|on|whatsapp|telegram)\s+", "", command.lower())
     if target_name:
         message_intent = message_intent.replace(target_name.lower(), "").strip()
-    
+
     return {
         "platform": platform,
         "recipient": target_name,
@@ -30,7 +33,11 @@ def parse_command_fallback(command):
 
 def socialmedia(command, max_retries=3):
     # Configure Gemini with API key from environment variable
-    api_key = os.getenv("GEMINI_API_KEY", "AIzaSyCUOD-gu4qPRCMLIQWyGl0pj6FmUH1EwGM")
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        speak("Gemini API key is not configured. Please set it in the .env file.")
+        return
+
     genai.configure(api_key=api_key)
     flash = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -131,33 +138,13 @@ def socialmedia(command, max_retries=3):
 
     return True
 
-def status():
-    speak("Checking unread messages on WhatsApp and Telegram.")
-    
-    whatsapp_unread = 0
-    telegram_unread = 0
-    
-    try:
-        result = subprocess.run(["node", "check_status.js"], capture_output=True, text=True, timeout=30)
-        if result.returncode == 0:
-            unread_counts = json.loads(result.stdout.strip())
-            whatsapp_unread = unread_counts.get("whatsapp", 0)
-            telegram_unread = unread_counts.get("telegram", 0)
-    except Exception as e:
-        print(f"Error checking status: {e}")
-    
-    speak(f"Sir, you have {whatsapp_unread} unread messages on WhatsApp and {telegram_unread} unread messages on Telegram.")
-
 async def TranslateAndExecute(commands: list[str]):
     funcs = []
     for command in commands:
         if command.startswith("socialmedia "):
             fun = asyncio.to_thread(socialmedia, command.removeprefix("socialmedia "))
             funcs.append(fun)
-        elif command == "check status":
-            fun = asyncio.to_thread(status)
-            funcs.append(fun)
-    
+
     results = await asyncio.gather(*funcs)
     for result in results:
         yield result

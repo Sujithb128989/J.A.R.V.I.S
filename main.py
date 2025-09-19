@@ -14,7 +14,7 @@ from Backend.Automation import Automation
 from Backend.SpeechToText import SpeechRecognition
 from Backend.Chatbot import ChatBot
 from Backend.Speech import TextToSpeech
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 from asyncio import run
 from time import sleep
 import subprocess
@@ -22,11 +22,13 @@ import threading
 import json
 import random
 import os
+import sys
 from Backend.Automation import battery_Alert,check_plug
 
-env_vars = dotenv_values(".env")
-Username = env_vars.get("Username")
-Assistantname = env_vars.get("Assistantname")
+load_dotenv()
+
+Username = os.getenv("Username")
+Assistantname = os.getenv("Assistantname")
 DefaultMessage = f'''{Username} : hello {Assistantname}, How are you?
 {Assistantname} : For you sir! Im always doing well. What use may I be of today?'''
 subprocesses= []
@@ -34,16 +36,20 @@ Functions = [ "open","close","play","system","content","googlesearch","youtubese
 
 # chats
 def ShowDefaultChatIfNoChats():
-    File = open(r'Data\ChatLog.json','r',encoding= 'utf-8')
-    if len(File.read())<5:
+    chat_log_path = os.path.join("Data", "ChatLog.json")
+    if not os.path.exists(chat_log_path) or os.path.getsize(chat_log_path) < 5:
         with open(TempDirectoryPath('Database.data'),'w',encoding='utf-8') as file:
             file.write("")
         with open(TempDirectoryPath('Responses.data'),'w',encoding='utf-8') as file:
             file.write(DefaultMessage)
 
-        #chat history    
+        #chat history
 def ReadChatLogJson():
-    with open(r'Data\ChatLog.json','r',encoding='utf-8') as file:
+    chat_log_path = os.path.join("Data", "ChatLog.json")
+    if not os.path.exists(chat_log_path):
+        with open(chat_log_path, 'w') as f:
+            json.dump([], f)
+    with open(chat_log_path,'r',encoding='utf-8') as file:
         chatlog_data = json.load(file)
     return chatlog_data
 
@@ -106,7 +112,7 @@ def MainExecution():
         if "generate" in queries:
              ImageGenerationQuery = str(queries)
              ImageExecution = True
-    
+
      for queries in Decision:
         if TaskExecution == False:
             if any(queries.startswith(func) for func in Functions):
@@ -115,13 +121,13 @@ def MainExecution():
 
 
      if ImageExecution == True:
-         with open(r"Frontend/Files/ImageGeneration.data", "w") as file:
+        image_generation_data_path = os.path.join("Frontend", "Files", "ImageGeneration.data")
+        with open(image_generation_data_path, "w") as file:
            file.write(f"{ImageGenerationQuery},True")
            print(f"Wrote to file: {ImageGenerationQuery},True")
-         try:
-           # Use the .venv Python explicitly
-           python_path = r"C:\Users\Asus\Desktop\Jarvisxalucard\.venv\Scripts\python.exe"
-           script_path = r"C:\Users\Asus\Desktop\Jarvisxalucard\Backend\ImageGeneration.py"
+        try:
+           python_path = sys.executable
+           script_path = os.path.join("Backend", "ImageGeneration.py")
            p1 = subprocess.Popen([python_path, script_path],
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                          stdin=subprocess.PIPE, shell=False)
@@ -130,11 +136,11 @@ def MainExecution():
            out, err = p1.communicate(timeout=5)
            print(f"Subprocess output: {out.decode()}")
            print(f"Subprocess errors: {err.decode()}")
-         except Exception as e:
+        except Exception as e:
            print(f"Error starting ImageGeneration.py: {e}")
 
 
-            
+
      if G and R or R:
 
         SetAssistantStatus("searching...")
@@ -170,11 +176,11 @@ def MainExecution():
                 TextToSpeech(Answer)
                 SetAssistantStatus("Answering...")
                 os._exit(1)
-            
+
 def FirstThread():
      while True:
         CurrentStatus = GetMicrophoneStatus()
-        
+
         if CurrentStatus == "True":
             MainExecution()
         else:
@@ -191,9 +197,9 @@ if __name__ == "__main__":
     SecondThread()
     alert_thread = threading.Thread(target=battery_Alert)
     plug_thread = threading.Thread(target=check_plug)
-    
+
     alert_thread.start()
     plug_thread.start()
-    
+
     alert_thread.join()  # Keeps main thread alive
     plug_thread.join()

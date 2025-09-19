@@ -16,9 +16,9 @@ pyQt5
 webdriver-manager
 keyboard
 langdetect
- simpleaudio
- easyocr
- pydub
+simpleaudio
+easyocr
+pydub
 ffmpeg
 opencv-python
 pycaw
@@ -28,16 +28,17 @@ mediapipe
 numpy
 wmi
 pyaudio
-markdownify 
-ggoogle-api-python-client
+markdownify
+google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 openai
 transformers
-pptx
-youtube_transcript_api 
+python-pptx
+youtube_transcript_api
 comtypes
-pdf2image 
+pdf2image
 feedparser
 screen-brightness-control
 pollinations
+pywin32
