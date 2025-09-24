@@ -1,9 +1,12 @@
 import sys
 import os
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTextEdit, QWidget, QVBoxLayout, QPushButton, QLabel, QHBoxLayout, QFrame
+import requests
+import json
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTextEdit, QWidget, QVBoxLayout, QPushButton, QLabel, QHBoxLayout, QFrame, QGridLayout
 from PyQt5.QtGui import QIcon, QPainter, QColor, QTextCharFormat, QFont, QMovie
-from PyQt5.QtCore import Qt, QSize, QTimer
+from PyQt5.QtCore import Qt, QSize, QTimer, QTime
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -11,15 +14,14 @@ ASSISTANT_NAME = os.getenv("Assistantname", "J.A.R.V.I.S")
 CURRENT_DIR = os.getcwd()
 TEMP_DIR_PATH = os.path.join(CURRENT_DIR, "Frontend", "Files")
 GRAPHICS_DIR_PATH = os.path.join(CURRENT_DIR, "Frontend", "Graphics")
+DEFAULT_CITY = "New York" # You can change this to your city
 
-# --- Helper Functions (re-added for compatibility) ---
+# --- Helper Functions ---
 
 def get_file_path(directory, filename):
-    """Constructs a full path to a file."""
     return os.path.join(directory, filename)
 
 def read_from_file(filepath):
-    """Reads content from a file."""
     try:
         with open(filepath, "r", encoding="utf-8") as file:
             return file.read().strip()
@@ -27,113 +29,73 @@ def read_from_file(filepath):
         return ""
 
 def write_to_file(filepath, content):
-    """Writes content to a file."""
     with open(filepath, "w", encoding="utf-8") as file:
         file.write(content)
 
-def SetAssistantStatus(Status):
-    write_to_file(get_file_path(TEMP_DIR_PATH, "Status.data"), Status)
+def get_weather(city):
+    try:
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1&format=json"
+        geo_response = requests.get(geo_url).json()
+        if "results" not in geo_response:
+            return None
 
-def GetAssistantStatus():
-    return read_from_file(get_file_path(TEMP_DIR_PATH, "Status.data"))
+        location = geo_response["results"][0]
+        lat = location["latitude"]
+        lon = location["longitude"]
 
-def ShowTextToScreen(Text):
-    write_to_file(get_file_path(TEMP_DIR_PATH, "Responses.data"), Text)
+        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+        weather_response = requests.get(weather_url).json()
 
-def SetMicrophoneStatus(Command):
-    write_to_file(get_file_path(TEMP_DIR_PATH, "Mic.data"), Command)
+        if "current_weather" in weather_response:
+            return {
+                "location": location.get("name", city),
+                "country": location.get("country", ""),
+                "temperature": weather_response["current_weather"].get("temperature"),
+                "humidity": "N/A", # Open-Meteo does not provide humidity directly in current_weather
+                "condition_code": weather_response["current_weather"].get("weathercode"),
+            }
+    except Exception as e:
+        print(f"Error getting weather: {e}")
+        return None
 
-def GetMicrophoneStatus():
-    return read_from_file(get_file_path(TEMP_DIR_PATH, "Mic.data"))
-
-def TempDirectoryPath(Filename):
-    return get_file_path(TEMP_DIR_PATH, Filename)
-
-def AnswerModifier(Answer):
-    lines = Answer.split('\n')
-    non_empty_lines = [line for line in lines if line.strip()]
-    modified_answer = '\n'.join(non_empty_lines)
-    return modified_answer
-
-def QueryModifier(Query):
-    new_query = Query.lower().strip()
-    query_words = new_query.split()
-    question_words = ["how", "what", "who", "where", "when", "why", "which", "whose", "whom", "can you", "what's", "where's", "how"]
-
-    if any(word in new_query for word in question_words):
-        if query_words and query_words[-1][-1] in ['.', '?', '1']:
-            new_query = new_query[:-1]
-        else:
-            new_query = new_query + "?"
-    else:
-        if query_words and query_words[-1][-1] in ['.', '?', '1']:
-            new_query = new_query[:-1] + "."
-        else:
-            new_query = new_query + ","
-    return new_query.capitalize()
+def get_weather_condition(code):
+    conditions = {0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast"}
+    return conditions.get(code, "N/A")
 
 # --- Centralized Stylesheet ---
 
 STYLESHEET = """
-QWidget {
-    background-color: #121212;
+QWidget#MainWidget {
+    background-color: #0D0D0D;
     color: #E0E0E0;
-    font-family: 'Segoe UI', Arial, sans-serif;
+    font-family: 'Orbitron', sans-serif;
 }
-
-QMainWindow {
-    border: 1px solid #333;
+QLabel {
+    color: #00AACC;
+    font-size: 16px;
 }
-
-QTextEdit {
-    background-color: #1E1E1E;
-    border: 1px solid #333;
-    border-radius: 4px;
-    font-size: 14px;
-    padding: 10px;
+QLabel#TitleLabel {
+    font-size: 24px;
+    font-weight: bold;
+    color: #00FFFF;
+    padding-bottom: 10px;
 }
-
-QScrollBar:vertical {
-    border: none;
-    background: #1E1E1E;
-    width: 10px;
-    margin: 0px 0px 0px 0px;
-}
-
-QScrollBar::handle:vertical {
-    background: #555;
-    min-height: 20px;
-    border-radius: 5px;
-}
-
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-    background: none;
-}
-
-QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-    background: none;
-}
-
-QPushButton#MicButton {
-    background-color: #1E1E1E;
-    border: 2px solid #555;
-    border-radius: 35px; /* Makes it circular */
-    padding: 10px;
-}
-
-QPushButton#MicButton:hover {
-    border-color: #007ACC;
-}
-
 QLabel#StatusLabel {
     font-size: 18px;
-    font-weight: bold;
-    color: #00AACC;
+    color: #FFFFFF;
 }
-
-QLabel#TitleLabel {
-    font-size: 12px;
-    color: #888;
+QTextEdit {
+    background-color: rgba(0, 0, 0, 0.5);
+    border: 1px solid #00FFFF;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #E0E0E0;
+    padding: 10px;
+}
+QPushButton#MicButton {
+    background-color: transparent;
+    border: 2px solid #00FFFF;
+    border-radius: 40px;
 }
 """
 
@@ -141,48 +103,59 @@ class JarvisUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.mic_is_on = False
-        self.old_chat_message = ""
-        self.old_status_message = ""
         self.initUI()
 
     def initUI(self):
         self.setWindowTitle(f"{ASSISTANT_NAME} AI")
-        self.setGeometry(100, 100, 600, 800)
-        self.setStyleSheet(STYLESHEET)
+        self.setGeometry(100, 100, 800, 900)
 
-        # Central Widget and Layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
+        main_widget = QWidget()
+        main_widget.setObjectName("MainWidget")
+        main_widget.setStyleSheet(STYLESHEET)
+        self.setCentralWidget(main_widget)
 
-        # Title Label
-        title_label = QLabel(f"{ASSISTANT_NAME} AI", self)
+        main_layout = QVBoxLayout(main_widget)
+
+        # --- Top Grid for Data Widgets ---
+        top_grid = QGridLayout()
+
+        self.time_label = QLabel("00:00:00")
+        self.date_label = QLabel("Date")
+        self.location_label = QLabel("Location")
+        self.weather_label = QLabel("Weather")
+
+        top_grid.addWidget(self.time_label, 0, 0, Qt.AlignLeft)
+        top_grid.addWidget(self.date_label, 1, 0, Qt.AlignLeft)
+        top_grid.addWidget(self.location_label, 0, 1, Qt.AlignRight)
+        top_grid.addWidget(self.weather_label, 1, 1, Qt.AlignRight)
+
+        main_layout.addLayout(top_grid)
+        main_layout.addWidget(QFrame(self)) # Spacer
+
+        # --- Title ---
+        title_label = QLabel(ASSISTANT_NAME, self)
         title_label.setObjectName("TitleLabel")
         title_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(title_label)
 
-        # Chat Display
+        # --- Chat Display ---
         self.chat_display = QTextEdit(self)
         self.chat_display.setReadOnly(True)
+        main_layout.addWidget(self.chat_display, 1)
 
-        # Status Label
+        # --- Status Label ---
         self.status_label = QLabel("Initializing...", self)
         self.status_label.setObjectName("StatusLabel")
         self.status_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.status_label)
 
-        # Microphone Button
+        # --- Mic Button ---
         self.mic_button = QPushButton(self)
         self.mic_button.setObjectName("MicButton")
-        self.mic_button.setFixedSize(70, 70)
-        self.mic_button.setIconSize(QSize(40, 40))
+        self.mic_button.setFixedSize(80, 80)
+        self.mic_button.setIconSize(QSize(50, 50))
         self.mic_button.clicked.connect(self.toggle_microphone)
         self.update_mic_icon()
-
-        # Layout Assembly
-        main_layout.addWidget(title_label)
-        main_layout.addWidget(self.chat_display, 1) # Give chat display more stretch
-        main_layout.addWidget(self.status_label)
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
@@ -190,14 +163,32 @@ class JarvisUI(QMainWindow):
         button_layout.addStretch()
         main_layout.addLayout(button_layout)
 
-        # Timer to update UI from files
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_ui_from_files)
-        self.timer.start(200) # Update every 200ms
+        # --- Timers ---
+        self.ui_timer = QTimer(self)
+        self.ui_timer.timeout.connect(self.update_ui_from_files)
+        self.ui_timer.start(200)
+
+        self.data_timer = QTimer(self)
+        self.data_timer.timeout.connect(self.update_data_widgets)
+        self.data_timer.start(1000) # Update every second for the clock
+        self.update_data_widgets(initial=True) # Initial call
+
+    def update_data_widgets(self, initial=False):
+        # Update Time
+        current_time = QTime.currentTime()
+        self.time_label.setText(current_time.toString('hh:mm:ss'))
+
+        # Update Date, Location, and Weather less frequently
+        if initial or current_time.second() == 0:
+            self.date_label.setText(datetime.now().strftime("%A, %B %d, %Y"))
+            weather_data = get_weather(DEFAULT_CITY)
+            if weather_data:
+                self.location_label.setText(f"{weather_data['location']}, {weather_data['country']}")
+                self.weather_label.setText(f"{weather_data['temperature']}°C, {get_weather_condition(weather_data['condition_code'])}")
 
     def toggle_microphone(self):
         self.mic_is_on = not self.mic_is_on
-        SetMicrophoneStatus(str(self.mic_is_on))
+        write_to_file(get_file_path(TEMP_DIR_PATH, "Mic.data"), str(self.mic_is_on))
         self.update_mic_icon()
 
     def update_mic_icon(self):
@@ -205,27 +196,22 @@ class JarvisUI(QMainWindow):
         self.mic_button.setIcon(QIcon(get_file_path(GRAPHICS_DIR_PATH, icon_path)))
 
     def update_ui_from_files(self):
-        # Update chat display
         chat_message = read_from_file(get_file_path(TEMP_DIR_PATH, "Responses.data"))
-        if chat_message and chat_message != self.old_chat_message:
+        if chat_message:
             self.chat_display.append(chat_message)
-            self.old_chat_message = chat_message
+            write_to_file(get_file_path(TEMP_DIR_PATH, "Responses.data"), "") # Clear after reading
 
-        # Update status label
         status_message = read_from_file(get_file_path(TEMP_DIR_PATH, "Status.data"))
-        if status_message and status_message != self.old_status_message:
+        if status_message:
             self.status_label.setText(status_message)
-            self.old_status_message = status_message
 
 def GraphicalUserInterface():
     app = QApplication(sys.argv)
+    # You might need to install this font if it's not on your system
+    QFont.insertDatabase('https://fonts.google.com/specimen/Orbitron')
     window = JarvisUI()
     window.show()
     sys.exit(app.exec_())
 
 if __name__ == "__main__":
-    # Initialize status files
-    SetMicrophoneStatus("False")
-    SetAssistantStatus("Ready")
-    ShowTextToScreen("")
     GraphicalUserInterface()

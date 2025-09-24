@@ -14,7 +14,7 @@ from Backend.Automation import Automation
 from Backend.SpeechToText import SpeechRecognition
 from Backend.Chatbot import ChatBot
 from Backend.Speech import TextToSpeech
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 from asyncio import run
 from time import sleep
 import subprocess
@@ -22,13 +22,11 @@ import threading
 import json
 import random
 import os
-import sys
 from Backend.Automation import battery_Alert,check_plug
 
-load_dotenv()
-
-Username = os.getenv("Username")
-Assistantname = os.getenv("Assistantname")
+env_vars = dotenv_values(".env")
+Username = env_vars.get("Username")
+Assistantname = env_vars.get("Assistantname")
 DefaultMessage = f'''{Username} : hello {Assistantname}, How are you?
 {Assistantname} : For you sir! Im always doing well. What use may I be of today?'''
 subprocesses= []
@@ -36,8 +34,8 @@ Functions = [ "open","close","play","system","content","googlesearch","youtubese
 
 # chats
 def ShowDefaultChatIfNoChats():
-    chat_log_path = os.path.join("Data", "ChatLog.json")
-    if not os.path.exists(chat_log_path) or os.path.getsize(chat_log_path) < 5:
+    File = open(r'Data\ChatLog.json','r',encoding= 'utf-8')
+    if len(File.read())<5:
         with open(TempDirectoryPath('Database.data'),'w',encoding='utf-8') as file:
             file.write("")
         with open(TempDirectoryPath('Responses.data'),'w',encoding='utf-8') as file:
@@ -45,11 +43,7 @@ def ShowDefaultChatIfNoChats():
 
         #chat history
 def ReadChatLogJson():
-    chat_log_path = os.path.join("Data", "ChatLog.json")
-    if not os.path.exists(chat_log_path):
-        with open(chat_log_path, 'w') as f:
-            json.dump([], f)
-    with open(chat_log_path,'r',encoding='utf-8') as file:
+    with open(r'Data\ChatLog.json','r',encoding='utf-8') as file:
         chatlog_data = json.load(file)
     return chatlog_data
 
@@ -121,13 +115,13 @@ def MainExecution():
 
 
      if ImageExecution == True:
-        image_generation_data_path = os.path.join("Frontend", "Files", "ImageGeneration.data")
-        with open(image_generation_data_path, "w") as file:
+         with open(r"Frontend/Files/ImageGeneration.data", "w") as file:
            file.write(f"{ImageGenerationQuery},True")
            print(f"Wrote to file: {ImageGenerationQuery},True")
-        try:
-           python_path = sys.executable
-           script_path = os.path.join("Backend", "ImageGeneration.py")
+         try:
+           # Use the .venv Python explicitly
+           python_path = r"C:\Users\Asus\Desktop\Jarvisxalucard\.venv\Scripts\python.exe"
+           script_path = r"C:\Users\Asus\Desktop\Jarvisxalucard\Backend\ImageGeneration.py"
            p1 = subprocess.Popen([python_path, script_path],
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                          stdin=subprocess.PIPE, shell=False)
@@ -136,7 +130,7 @@ def MainExecution():
            out, err = p1.communicate(timeout=5)
            print(f"Subprocess output: {out.decode()}")
            print(f"Subprocess errors: {err.decode()}")
-        except Exception as e:
+         except Exception as e:
            print(f"Error starting ImageGeneration.py: {e}")
 
 
