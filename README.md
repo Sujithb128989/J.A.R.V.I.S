@@ -1,3 +1,4 @@
+Note: the code is kinda glitchy after major updates, testors required.
 # J.A.R.V.I.S. - Your Personal AI Assistant
 
 This project is a sophisticated, voice-controlled personal AI assistant named J.A.R.V.I.S. It integrates with multiple AI models and services to provide a wide range of functionalities, from answering general questions to automating system tasks.
